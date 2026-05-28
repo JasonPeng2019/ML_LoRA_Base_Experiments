@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Hugging Face / model caches
+cache/
+.huggingface/
+hf_cache/
+transformers_cache/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Secrets
+.env
+*.env
+
+# Logs
+*.log
+
+# LaTeX build artifacts
+*.aux
+*.fdb_latexmk
+*.fls
+*.out
+*.synctex.gz
+*.toc
