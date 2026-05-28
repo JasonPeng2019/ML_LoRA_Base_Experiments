@@ -1,0 +1,23 @@
+% Subspace overlap phi(k) between LoRA checkpoint delta and Full-FT delta (SST-2, RoBERTa-base)
+% phi(k) = ||U_FT[:,0:k]^T U_LoRA[:,0:k]||_F^2 / k
+% Exact values from codex_presentation_results/data/overlap_svd_metrics.json
+% Computed over all 24 attention query/value matrices (12 layers x {W_q, W_v})
+% Random baseline: k/d where d=768
+\begin{tabular}{rrrrrr}
+\toprule
+\textbf{$k$} & \textbf{Mean $\phi(k)$} & \textbf{Std $\phi(k)$} & \textbf{Max $\phi(k)$} & \textbf{Random ($k/d$)} & \textbf{Ratio} \\
+\midrule
+ 1 & 0.0472 & 0.0589 & 0.259 & 0.0013 & $36\times$ \\
+ 2 & 0.0546 & 0.0510 & 0.203 & 0.0026 & $21\times$ \\
+ 4 & 0.0625 & 0.0373 & 0.164 & 0.0052 & $12\times$ \\
+ 8 & 0.0847 & 0.0408 & 0.193 & 0.0104 & $8\times$ \\
+16 & 0.1091 & 0.0415 & 0.184 & 0.0208 & $5\times$ \\
+32 & 0.1031 & 0.0243 & 0.145 & 0.0417 & $2.5\times$ \\
+64 & \textbf{0.1228} & 0.0128 & 0.143 & 0.0833 & $1.5\times$ \\
+\bottomrule
+\end{tabular}
+\vspace{0.4em}
+
+\noindent\small $d=768$ (RoBERTa-base). The single top update direction ($k=1$) is 36$\times$ more
+aligned with the full-FT direction than random chance. At $k=64$, overlap is 1.5$\times$ random ---
+LoRA spreads over fewer directions than full FT, so enrichment shrinks as $k$ grows.

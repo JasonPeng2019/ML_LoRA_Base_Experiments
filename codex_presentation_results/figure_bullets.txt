@@ -1,0 +1,14 @@
+- Figure: svd_energy_keypoints.png
+  - Mean cumulative energy reaches 0.7068 at k=64.
+  - 80% mean energy is reached at k=107.
+  - Use this to argue full-FT updates are directionally concentrated.
+- Figure: subspace_overlap_mean_std.png
+  - Mean overlap phi(1)=0.0472, phi(16)=0.1091, phi(64)=0.1228.
+  - Computed across 24 SST-2 query/value matrices.
+  - Use this to show LoRA captures part of the full-FT update subspace.
+- Figure: oracle_vs_baselines_per_task.png
+  - Oracle-routed LoRA and per-task LoRA are identical (oracle routing consistency = 0 diff).
+  - Oracle-routed LoRA beats per-task Full-FT on RTE, MNLI, and QNLI, but trails on SST-2, MRPC, and QQP.
+- Figure: oracle_minus_fft_delta.png
+  - Weighted primary delta (oracle minus Full-FT): -0.0018.
+  - Task deltas make the tradeoff transparent instead of reporting only one average.

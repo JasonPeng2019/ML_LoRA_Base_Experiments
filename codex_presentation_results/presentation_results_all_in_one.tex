@@ -1,0 +1,51 @@
+\documentclass[11pt]{article}
+\usepackage[margin=0.8in]{geometry}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{longtable}
+\title{Presentation Results Pack: LoRA Geometry + Oracle Routing}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section*{Experiment Overview}
+\input{tables/table_experiment_overview.tex}
+
+\section*{Experiment 1: Full-FT Spectral Energy (SST-2)}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/svd_energy_keypoints.png}
+\caption{Mean cumulative spectral energy across SST-2 query/value update matrices.}
+\end{figure}
+\input{tables/table_svd_energy_summary.tex}
+
+\section*{Experiment 2: LoRA vs Full-FT Subspace Overlap (SST-2)}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/subspace_overlap_mean_std.png}
+\caption{Subspace overlap $\phi(k)$ with mean and $\pm 1$ std across matrices.}
+\end{figure}
+\input{tables/table_subspace_overlap.tex}
+
+\section*{Experiment 3: Oracle-Routed LoRA vs Baselines (6 GLUE tasks)}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.90\linewidth]{figures/oracle_vs_baselines_per_task.png}
+\caption{Primary metric comparison by task.}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.90\linewidth]{figures/oracle_minus_fft_delta.png}
+\caption{Per-task primary-metric delta between oracle-routed LoRA and per-task Full-FT.}
+\end{figure}
+
+\input{tables/table_oracle_vs_baselines_per_task.tex}
+
+\vspace{0.5em}
+\input{tables/table_oracle_vs_baselines_aggregate.tex}
+
+\end{document}

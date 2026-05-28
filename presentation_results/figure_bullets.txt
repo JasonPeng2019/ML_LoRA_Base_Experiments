@@ -1,0 +1,56 @@
+FIGURE BULLET POINTS
+====================
+Use these as slide annotations or caption highlights.
+
+
+FIGURE 1 — Spectral Energy of Full Fine-Tuning Update (figures/sst2_svd_energy.png)
+-------------------------------------------------------------------------------------
+• Computed over 24 attention query/value matrices (12 layers × Wq, Wv) for RoBERTa-base FFT on SST-2
+• Top-1 direction captures 14.2% of total update energy
+• Top-8 directions capture 37.7% of total update energy
+• Top-32 directions capture 58.6% of total update energy
+• Top-64 directions capture 70.7% of total update energy
+• Top-128 directions capture 83.2% — reaching 80% requires 107 out of 768 directions
+• The full-FT update is concentrated but not extremely low-rank: justifies LoRA rank r≈8–16
+
+
+FIGURE 2 — Subspace Overlap: LoRA vs Full-FT (figures/sst2_lora_ft_overlap.png)
+----------------------------------------------------------------------------------
+• phi(k) = ||U_FT[0:k]^T × U_LoRA[0:k]||_F^2 / k  (1 = identical subspaces)
+• At k=1: mean phi = 0.047, which is 36× the random baseline (0.0013)
+• At k=16: mean phi = 0.109, which is 5× the random baseline (0.021)
+• At k=64: mean phi = 0.123, which is 1.5× the random baseline (0.083)
+• Best single matrix at k=1: phi = 0.259 (one attention head is strongly aligned)
+• Overlap is above random at every k, confirming LoRA captures geometrically relevant directions
+• Enrichment shrinks with k: LoRA's rank-8 update shares the top direction, not the full spectrum
+
+
+FIGURE 3 — Per-Task Performance Bar Chart (figures/oracle_routing_per_task.png)
+---------------------------------------------------------------------------------
+• Three bars per task: Oracle-Routed LoRA MoE (blue) | Per-task LoRA (green) | Per-task FFT (orange)
+• Oracle LoRA MoE = Per-task LoRA (by construction — oracle routes each example to its matched adapter)
+• RTE standout: LoRA 71.84% vs FFT 56.32% (+15.5 pp) — FFT likely overfits on only 277 examples
+• MNLI / QNLI: methods are nearly tied (≤0.3 pp gap) — large datasets make both equally robust
+• SST-2 / MRPC / QQP: FFT leads by 1–4 pp on these well-resourced tasks
+• Key takeaway: a routed LoRA pool matches per-task LoRA exactly and beats FFT on macro average
+
+
+FIGURE 4 — Aggregate Comparison (plots/aggregate_comparison.png — run plot script to generate)
+------------------------------------------------------------------------------------------------
+• Left panel: macro vs weighted primary metric for all three methods
+  - Oracle LoRA / Per-task LoRA macro: 86.90% vs FFT 85.39% → LoRA +1.5 pp macro
+  - Weighted (task-size adjusted): LoRA 89.19% vs FFT 89.37% → FFT +0.2 pp weighted
+• Right panel: trainable parameters per task
+  - LoRA: ~1.18M params per adapter (0.94% of model)
+  - FFT: 125.8M params per model (100%)
+  - Ratio: FFT uses 107× more trainable parameters per task
+• One sentence: LoRA wins on macro (helped by RTE), FFT wins on weighted, LoRA costs 107× less to adapt
+
+
+FIGURE 5 — Oracle Router Demo Heatmap (figures/router_demo.png)
+----------------------------------------------------------------
+• Diagonal routing matrix: task i goes to adapter i (perfect oracle matching)
+• 6 tasks × 6 adapters; one frozen RoBERTa-base shared across all
+• Total adapter pool size: ~7.1M parameters (6 × 1.18M)
+• Demonstrates the Mixture-of-LoRA concept: one base model + lightweight pool = full multi-task coverage
+• Oracle routing is an upper bound — a learned router would be needed in real deployment

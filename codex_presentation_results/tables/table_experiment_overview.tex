@@ -1,0 +1,9 @@
+\begin{tabular}{p{0.28\linewidth}p{0.67\linewidth}}
+\toprule
+Experiment & Key measured result \\
+\midrule
+Exp 1: Full-FT SVD (SST-2 q/v) & Mean cumulative energy at k=64 is 0.7068; k=107 reaches 80\% energy. \\
+Exp 2: LoRA-FT subspace overlap (SST-2 q/v) & Mean overlap rises from 0.0472 at k=1 to 0.1228 at k=64 (computed over 24 matrices). \\
+Exp 3: Oracle-routed LoRA experts across 6 GLUE tasks & Weighted primary = 0.8919; vs per-task Full-FT weighted primary delta = -0.0018; end-to-end runtime = 44.61s. \\
+\bottomrule
+\end{tabular}

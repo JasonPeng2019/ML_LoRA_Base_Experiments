@@ -1,0 +1,23 @@
+Slide script: LoRA geometry and oracle-routed expert results
+
+1) Setup
+We evaluated RoBERTa-base checkpoints in three steps: full-FT geometry on SST-2, LoRA-vs-full-FT overlap on SST-2, and oracle-routed LoRA across six GLUE tasks.
+
+2) Experiment 1: Full-FT spectral energy
+Across 24 SST-2 query/value matrices, mean cumulative spectral energy is 0.7068 at k=64.
+Mean energy crosses 80% at k=107.
+Interpretation: full fine-tuning updates are not uniform; energy is concentrated in a subset of directions.
+
+3) Experiment 2: Subspace overlap
+LoRA/full-FT overlap increases from phi(1)=0.0472 to phi(64)=0.1228.
+These overlap stats are averaged over 24 query/value matrices.
+Interpretation: LoRA does not match all full-FT directions, but it tracks part of the task-relevant subspace.
+
+4) Experiment 3: Oracle-routed LoRA vs baselines
+Oracle-routed LoRA equals per-task LoRA exactly in this setup, because routing is task-oracle and each sample is sent to its matching expert.
+Weighted primary metric is 0.8919 for oracle-routed LoRA versus 0.8937 for per-task full-FT.
+That is a weighted primary delta of -0.0018.
+Per-task deltas show gains on RTE, MNLI, and QNLI, and drops on SST-2, MRPC, and QQP.
+
+5) Caveat
+This is an oracle-routing upper bound, not a learned router. The value is in showing feasibility and transparent per-task behavior.

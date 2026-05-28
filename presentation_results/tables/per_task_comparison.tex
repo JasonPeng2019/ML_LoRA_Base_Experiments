@@ -1,0 +1,19 @@
+% Per-task primary metric comparison: Oracle-Routed LoRA MoE vs Per-task LoRA vs Per-task Full Fine-Tuning
+% Source: outputs/oracle_routing_metrics.json
+% Primary metric = accuracy for single-label tasks; (accuracy + F1) / 2 for MRPC and QQP
+% Note: Oracle LoRA == Per-task LoRA because oracle routing selects the exact task-matched adapter.
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Task} & \textbf{N} & \textbf{Oracle LoRA MoE} & \textbf{Per-task LoRA} & \textbf{Per-task FFT} & \textbf{$\Delta$ (LoRA $-$ FFT)} \\
+\midrule
+SST-2          &   872 & 0.9427 & 0.9427 & 0.9518 & $-$0.0091 \\
+MRPC           &   408 & 0.8709 & 0.8709 & 0.9105 & $-$0.0396 \\
+RTE            &   277 & \textbf{0.7184} & \textbf{0.7184} & 0.5632 & $+$0.1552 \\
+MNLI (matched) & 2,000 & 0.8780 & 0.8780 & 0.8760 & $+$0.0020 \\
+QNLI           & 2,000 & 0.9235 & 0.9235 & 0.9200 & $+$0.0035 \\
+QQP            & 2,000 & 0.8804 & 0.8804 & 0.9021 & $-$0.0217 \\
+\midrule
+\textbf{Macro avg}    & 7,557 & \textbf{0.8690} & \textbf{0.8690} & 0.8539 & $+$0.0151 \\
+\textbf{Weighted avg} & 7,557 & 0.8919 & 0.8919 & \textbf{0.8937} & $-$0.0018 \\
+\bottomrule
+\end{tabular}

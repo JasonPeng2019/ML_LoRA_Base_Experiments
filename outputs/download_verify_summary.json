@@ -1,0 +1,32 @@
+{
+  "models": {
+    "base": "roberta-base",
+    "fft_sst2": "rambodazimi/roberta-base-finetuned-FFT-SST2",
+    "lora_sst2": "rambodazimi/roberta-base-finetuned-LoRA-SST2"
+  },
+  "lora_load_mode": "peft_adapter_merged",
+  "param_counts": {
+    "base": 124647170,
+    "fft_sst2": 124647170,
+    "lora_model": 124647170
+  },
+  "qv_counts": {
+    "base": 24,
+    "fft_sst2": 24,
+    "lora_model": 24,
+    "common_base_fft": 24,
+    "common_all": 24
+  },
+  "sample_common_qv_names": [
+    "roberta.encoder.layer.0.attention.self.query.weight",
+    "roberta.encoder.layer.0.attention.self.value.weight",
+    "roberta.encoder.layer.1.attention.self.query.weight",
+    "roberta.encoder.layer.1.attention.self.value.weight",
+    "roberta.encoder.layer.10.attention.self.query.weight",
+    "roberta.encoder.layer.10.attention.self.value.weight",
+    "roberta.encoder.layer.11.attention.self.query.weight",
+    "roberta.encoder.layer.11.attention.self.value.weight",
+    "roberta.encoder.layer.2.attention.self.query.weight",
+    "roberta.encoder.layer.2.attention.self.value.weight"
+  ]
+}

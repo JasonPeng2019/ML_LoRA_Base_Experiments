@@ -1,0 +1,90 @@
+PRESENTER SCRIPT
+================
+Read aloud or use as talking notes. Each section corresponds to a slide.
+
+
+--- SLIDE: EXPERIMENT 1 — SPECTRAL ENERGY OF FULL FINE-TUNING UPDATES ---
+
+Our first follow-up experiment is SVD of a full fine-tuning update. We fully fine-tune a smaller
+model — specifically RoBERTa-base on SST-2 — compute the true weight delta, and check whether its
+singular values decay quickly. If most of the energy is in the top few singular values, that would
+directly support the low-rank update hypothesis.
+
+Our results for this are: on the plot, each faint blue line is one of the 24 attention query or
+value matrices across RoBERTa's 12 layers, and the dark curve is the mean. Concretely: the top
+single direction captures 14 percent of total update energy. The top 8 directions capture 38
+percent. The top 32 directions capture 59 percent. And even using all 128 directions we looked at
+only gets us to 83 percent — you need 107 out of 768 possible directions to explain 80 percent of
+the energy.
+
+These show that full fine-tuning updates are geometrically concentrated but not extremely low-rank.
+The energy falls off steadily — there isn't a clean "elbow" at rank 8 or 16, but the top directions
+do carry a disproportionate share of the signal. This is exactly the motivation LoRA relies on:
+you don't need to update all 768 dimensions to make meaningful task progress; a small low-rank
+correction to the most important directions is often enough.
+
+
+--- SLIDE: EXPERIMENT 2 — SUBSPACE OVERLAP: LoRA vs. FULL FINE-TUNING ---
+
+Second, we compared LoRA's learned subspace against the full fine-tuning subspace. If LoRA finds
+the same top directions as full fine-tuning, that would show LoRA is not merely a cheap
+approximation, but is actually capturing the important part of the full update.
+
+We measured this using the overlap metric phi of k — the squared Frobenius norm of the cross-gram
+matrix between the top-k left singular vectors of the full-FT delta and the LoRA checkpoint delta,
+divided by k. A score of 1 would mean the subspaces are identical; the random-subspace baseline
+is k divided by 768.
+
+We had these results: at k equals 1, the mean overlap is 0.047, which is 36 times the random
+baseline. At k equals 16, the overlap is 0.109, about 5 times random. At k equals 64, it's 0.123,
+about 1.5 times random. The best single matrix at k equals 1 reaches 0.259. These values were
+computed over all 24 attention query and value matrices.
+
+These show that LoRA and full fine-tuning do not learn the same subspace — the maximum overlap we
+see is around 12 to 13 percent — but they are significantly more aligned than random, especially
+at small k. The single most important update direction is 36 times more shared than chance would
+predict. As k grows, the enrichment shrinks: this makes sense because LoRA only uses 8 rank
+dimensions while full fine-tuning spreads energy across over a hundred directions. So LoRA isn't
+just memorizing noise — it's finding the same dominant task-relevant direction, just without the
+long tail.
+
+
+--- SLIDE: EXPERIMENT 3 — MIXTURE OF LoRA EXPERTS (ORACLE ROUTING) ---
+
+Third, we tested mixtures of LoRA modules. The question is whether several task-specific LoRA
+modules can be combined to cover a more general model. Concretely, we take one frozen RoBERTa-base,
+keep a pool of six task-specific LoRA adapters — one for each GLUE task — and use an oracle router
+that sends each example to the adapter that matches its task. We evaluate this oracle-routed mixture
+against running each LoRA adapter standalone, and against full fine-tuned models evaluated on their
+own task.
+
+For this experiment, we got: on SST-2, oracle LoRA and per-task LoRA both score 94.3 percent versus
+full FT at 95.2 percent — a 0.9 point gap. On MRPC, LoRA scores 87.1 percent versus FFT at 91.1
+percent. On RTE, LoRA scores 71.8 percent while full fine-tuning only reaches 56.3 percent —
+that's a 15.5 percentage point advantage for LoRA. On the large tasks MNLI and QNLI, the two
+methods are nearly tied within half a point. On QQP, LoRA scores 88.0 versus FFT at 90.2. Across
+all six tasks, the macro average is 86.9 percent for LoRA versus 85.4 percent for FFT. The weighted
+average — dominated by the large MNLI, QNLI, and QQP sets — is nearly tied: 89.2 percent for LoRA
+versus 89.4 percent for FFT. Meanwhile, LoRA uses about 1.18 million trainable parameters per
+adapter versus 125.8 million for full fine-tuning — that's 107 times fewer parameters.
+
+This shows that the oracle-routed LoRA mixture matches standalone per-task LoRA exactly, because
+the oracle router selects the right adapter for every example. More importantly, it demonstrates
+the key Mixture-of-LoRA idea: a single shared base model plus a pool of six lightweight adapters
+covers all six tasks simultaneously — with better macro performance than full fine-tuning and at
+107 times lower parameter cost per task. The one place full fine-tuning clearly wins is on the
+large, well-resourced tasks like MRPC and QQP where its extra capacity helps. But LoRA's big win
+on RTE — a small 277-example dataset — shows that lightweight adapters also resist overfitting,
+which is a meaningful practical advantage.
+
+
+--- SLIDE: CAVEATS ---
+
+Before I wrap up, a few honest caveats. All of this is a single-seed exploratory prototype, not a
+rigorous multi-seed benchmark. The LoRA overlap analysis uses merged checkpoint deltas rather than
+raw adapter matrices, which is a valid proxy but slightly less clean. The oracle router knows task
+labels at inference time — a real deployment would need a learned classifier or embedding-based
+router. And all numbers are from GLUE validation splits, not held-out test sets. With those
+caveats stated, the core story holds: LoRA updates are geometrically structured, they partially
+share the dominant directions of full fine-tuning, and a task-routed pool of lightweight adapters
+is a practical path to a general multi-task model at a fraction of the fine-tuning cost.

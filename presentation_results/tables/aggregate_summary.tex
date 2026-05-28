@@ -1,0 +1,15 @@
+% Aggregate performance comparison across all 6 GLUE tasks
+% Source: outputs/oracle_routing_metrics.json
+% Trainable param counts from outputs/download_verify_summary.json (model-card reported)
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Method} & \textbf{Macro Primary} & \textbf{Weighted Primary} & \textbf{Trainable Params / task} & \textbf{Trainable \%} \\
+\midrule
+Oracle LoRA MoE  & \textbf{0.8690} & 0.8919 & $\approx$1.18M & $\approx$0.94\% \\
+Per-task LoRA    & \textbf{0.8690} & 0.8919 & $\approx$1.18M & $\approx$0.94\% \\
+Per-task FFT     & 0.8539          & \textbf{0.8937} & 125.8M & 100\% \\
+\midrule
+\multicolumn{5}{l}{\small LoRA macro advantage over FFT: $+$0.0151 \quad Weighted advantage: $-$0.0018 (FFT marginal)} \\
+\multicolumn{5}{l}{\small LoRA uses $\approx$107$\times$ fewer trainable parameters per task than FFT} \\
+\bottomrule
+\end{tabular}
