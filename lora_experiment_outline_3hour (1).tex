@@ -1,0 +1,403 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.8in]{geometry}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+
+\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue, citecolor=blue}
+\setlist[itemize]{leftmargin=1.4em,itemsep=0.15em,topsep=0.25em}
+\setlist[enumerate]{leftmargin=1.4em,itemsep=0.15em,topsep=0.25em}
+
+\title{Three-Hour LoRA Demo Plan: Spectra, Subspace Overlap, and Router-Style Mixtures}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Goal}
+
+This is a presentation-first, non-rigorous demo plan designed to finish in roughly three hours on NVIDIA Quadro-class GPUs. The goal is not to reproduce the LoRA paper or make a publishable claim. The goal is to produce clean-looking slides with:
+\begin{enumerate}
+    \item one spectral plot suggesting full fine-tuning updates are concentrated in a few directions;
+    \item one overlap plot comparing LoRA and full fine-tuning update subspaces;
+    \item one Mixture-of-LoRA-style table or router visualization using already-trained adapters where possible.
+\end{enumerate}
+
+The plan intentionally uses existing Hugging Face checkpoints and model-card numbers whenever possible. Do not run multi-seed experiments, generation tasks, GPT-2 Medium, full NLG evaluation, or custom MoE infrastructure in the first pass.
+
+\section{Hard Time Budget}
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Time & Task & Output \\
+\midrule
+0:00--0:30 & Download checkpoints and run sanity script & Models load successfully \\
+0:30--1:20 & Compute full-FT deltas and SVD & Spectral decay figure \\
+1:20--2:00 & Extract LoRA deltas and compute overlap & Subspace overlap figure \\
+2:00--2:35 & Run router-style scoring or simulated MoLoRA table & Routing/mixture table \\
+2:35--3:00 & Make plots and slide-ready summary & Final figures and numbers \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Use These Exact Models}
+
+\subsection{Primary model family: RoBERTa-base on GLUE}
+
+Use \texttt{roberta-base} as the base model. It is small enough to run quickly, uses standard Transformer matrices, and has matching full fine-tuned and LoRA checkpoints available.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Purpose & Task & Hugging Face model \\
+\midrule
+Base & All & \texttt{roberta-base} \\
+Full FT & SST-2 & \texttt{rambodazimi/roberta-base-finetuned-FFT-SST2} \\
+LoRA & SST-2 & \texttt{rambodazimi/roberta-base-finetuned-LoRA-SST2} \\
+Full FT & MRPC & \texttt{rambodazimi/roberta-base-finetuned-FFT-MRPC} \\
+LoRA & MRPC & \texttt{rambodazimi/roberta-base-finetuned-LoRA-MRPC} \\
+LoRA expert & RTE & \texttt{rambodazimi/roberta-base-finetuned-LoRA-RTE} \\
+LoRA expert & MNLI & \texttt{rambodazimi/roberta-base-finetuned-LoRA-MNLI} \\
+LoRA expert & QNLI & \texttt{rambodazimi/roberta-base-finetuned-LoRA-QNLI} \\
+LoRA expert & QQP & \texttt{rambodazimi/roberta-base-finetuned-LoRA-QQP} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The first presentation target should be SST-2 only. Add MRPC only if the scripts work immediately.
+
+\paragraph{Model-card numbers to quote.}
+Use the model-card numbers as headline numbers rather than rerunning full GLUE evaluation. For example, \texttt{rambodazimi/roberta-base-finetuned-LoRA-SST2} reports 94.27\% accuracy, 1,181,954 trainable parameters, 125,829,124 total parameters, and 0.94\% trainable parameters. \texttt{rambodazimi/roberta-base-finetuned-LoRA-RTE} reports 71.84\% accuracy and 0.71\% trainable parameters. These are not your measured results unless you rerun evaluation; label them as checkpoint/model-card metrics.
+
+\subsection{Ultra-fast fallback}
+
+If RoBERTa-base is still too slow or the checkpoint pairing is annoying, switch to:
+\begin{itemize}
+    \item base: \texttt{distilbert/distilbert-base-uncased};
+    \item full fine-tuned SST-2: \texttt{distilbert/distilbert-base-uncased-finetuned-sst-2-english}.
+\end{itemize}
+
+This fallback is best for Experiment 1 only, because it gives a fast full-FT delta. It is less ideal for LoRA overlap unless a matching LoRA adapter is available.
+
+\section{Cut Everything Else}
+
+Do \textbf{not} do the following in the three-hour version:
+\begin{itemize}
+    \item no GPT-2 Medium;
+    \item no E2E/WebNLG/DART generation evaluation;
+    \item no three-seed runs;
+    \item no full rank sweep;
+    \item no full SVD across every matrix;
+    \item no token-wise router;
+    \item no layer-wise router;
+    \item no full multitask fine-tuning;
+    \item no oracle routing over every example;
+    \item no faithful reproduction of paper hyperparameters.
+\end{itemize}
+
+Keep only:
+\begin{itemize}
+    \item SST-2 first;
+    \item one full-FT checkpoint;
+    \item one LoRA checkpoint;
+    \item attention query/value matrices only;
+    \item all layers if easy, otherwise layers 0, middle, and last;
+    \item top-64 singular vectors only;
+    \item one router-style plot or table.
+\end{itemize}
+
+\section{Experiment A: Full Fine-Tuning SVD in Under One Hour}
+
+\subsection{Question}
+
+Do the full fine-tuning updates look low-rank enough to make a good slide?
+
+\subsection{Data}
+
+Use:
+\begin{itemize}
+    \item base: \texttt{roberta-base};
+    \item fine-tuned: \texttt{rambodazimi/roberta-base-finetuned-FFT-SST2}.
+\end{itemize}
+
+Compute:
+\[
+\Delta W_{\mathrm{FT}} = W_{\mathrm{FFT}} - W_0.
+\]
+
+\subsection{Matrices}
+
+Only use attention query and value matrices:
+\[
+W_q, \quad W_v.
+\]
+
+For RoBERTa-style models, these usually appear as names like:
+\begin{verbatim}
+roberta.encoder.layer.{L}.attention.self.query.weight
+roberta.encoder.layer.{L}.attention.self.value.weight
+\end{verbatim}
+
+\subsection{Metric}
+
+For each layer and matrix type, compute the cumulative top-$k$ spectral energy:
+\[
+E(k) = \frac{\sum_{i=1}^{k}\sigma_i^2}{\sum_i \sigma_i^2}.
+\]
+
+For speed, compute the full SVD only because RoBERTa-base matrices are small. If this is slow, compute only the top 64 singular values.
+
+\subsection{Slide output}
+
+Make one plot:
+\begin{quote}
+Cumulative spectral energy of full fine-tuning updates for $W_q$ and $W_v$.
+\end{quote}
+
+Make the caption simple:
+\begin{quote}
+``Most of the full fine-tuning update energy is concentrated in a small number of singular directions, which makes LoRA-style low-rank adaptation plausible.''
+\end{quote}
+
+\section{Experiment B: LoRA vs Full Fine-Tuning Subspace Overlap}
+
+\subsection{Question}
+
+Does an already-trained LoRA adapter point in a similar direction to the full fine-tuning update?
+
+\subsection{Data}
+
+Use:
+\begin{itemize}
+    \item base: \texttt{roberta-base};
+    \item full FT: \texttt{rambodazimi/roberta-base-finetuned-FFT-SST2};
+    \item LoRA: \texttt{rambodazimi/roberta-base-finetuned-LoRA-SST2}.
+\end{itemize}
+
+\subsection{Compute LoRA delta}
+
+For each LoRA layer, compute the merged update:
+\[
+\Delta W_{\mathrm{LoRA}} = \frac{\alpha}{r}BA.
+\]
+
+If the stored tensor names differ from the full model names, only compare the layers where mapping is obvious. If mapping is messy, use only the middle layer query/value matrices for the demo.
+
+\subsection{Overlap metric}
+
+Compute SVDs:
+\[
+\Delta W_{\mathrm{FT}} = U_{\mathrm{FT}}\Sigma_{\mathrm{FT}}V_{\mathrm{FT}}^\top,
+\qquad
+\Delta W_{\mathrm{LoRA}} = U_L\Sigma_LV_L^\top.
+\]
+
+Then compute:
+\[
+\phi(k,r) =
+\frac{\|U_{\mathrm{FT},1:k}^\top U_{L,1:r}\|_F^2}{\min(k,r)}.
+\]
+
+For the presentation, use:
+\[
+k \in \{1,4,8,16,32\}.
+\]
+
+\subsection{Slide output}
+
+Make one heatmap or bar plot:
+\begin{quote}
+Subspace overlap between full fine-tuning and LoRA update directions.
+\end{quote}
+
+A good-looking interpretation is:
+\begin{quote}
+``LoRA does not need to match the entire full fine-tuning update. It only needs to capture a small task-relevant subspace.''
+\end{quote}
+
+\section{Experiment C: Fake-It-Until-It-Works Mixture of LoRA Experts}
+
+\subsection{Goal}
+
+Do not build a full custom MoE system first. Build a quick router-style demo that looks like a Mixture-of-LoRA experiment.
+
+\subsection{Option 1: Fastest presentable version}
+
+Use existing LoRA experts and report their model-card task numbers as an ``expert pool.'' Then show a simulated or lightweight router that chooses the task expert.
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Expert & Adapter & Display metric \\
+\midrule
+Sentiment & \texttt{LoRA-SST2} & SST-2 accuracy from model card \\
+Paraphrase & \texttt{LoRA-MRPC} & MRPC accuracy/F1 from model card if available \\
+Entailment & \texttt{LoRA-RTE} & RTE accuracy from model card \\
+NLI & \texttt{LoRA-MNLI} & MNLI matched/mismatched from model card \\
+Question NLI & \texttt{LoRA-QNLI} & QNLI accuracy from model card if available \\
+Duplicate Qs & \texttt{LoRA-QQP} & QQP accuracy/F1 from model card if available \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+For slides, call this:
+\begin{quote}
+``A frozen base model with a pool of lightweight LoRA experts. A router selects the adapter based on the input/task.''
+\end{quote}
+
+This is enough for a conceptual presentation if you clearly say it is a prototype.
+
+\subsection{Option 2: Slightly more real, still fast}
+
+Use a task-name router:
+\begin{itemize}
+    \item if the example comes from SST-2, route to the SST-2 LoRA adapter;
+    \item if MRPC, route to MRPC;
+    \item if RTE, route to RTE;
+    \item if MNLI, route to MNLI.
+\end{itemize}
+
+This is not scientifically interesting, but it creates strong-looking numbers because it is essentially oracle task routing.
+
+\paragraph{Presentation label.}
+Call it ``oracle routed LoRA experts'' rather than pretending it is a learned router.
+
+\subsection{Option 3: Use X-LoRA only if setup is smooth}
+
+If the PEFT/X-LoRA setup works quickly, use X-LoRA. X-LoRA is designed for sparse or dense mixtures of LoRA experts with token-, layer-, or sequence-level scalings. For this three-hour demo, use sequence-level scalings only.
+
+If X-LoRA setup takes more than 30 minutes, abandon it and use Option 1 or Option 2.
+
+\section{Minimal Code Plan}
+
+\subsection{Download and inspect}
+
+\begin{verbatim}
+pip install -U torch transformers peft datasets accelerate scikit-learn matplotlib seaborn
+\end{verbatim}
+
+\begin{verbatim}
+from transformers import AutoModelForSequenceClassification
+
+base = AutoModelForSequenceClassification.from_pretrained("roberta-base")
+fft = AutoModelForSequenceClassification.from_pretrained(
+    "rambodazimi/roberta-base-finetuned-FFT-SST2"
+)
+lora = AutoModelForSequenceClassification.from_pretrained(
+    "rambodazimi/roberta-base-finetuned-LoRA-SST2"
+)
+\end{verbatim}
+
+If the LoRA checkpoint loads as a fully merged model rather than a PEFT adapter, that is okay. Use:
+\[
+\Delta W_{\mathrm{LoRA-ish}} = W_{\mathrm{LoRA\,model}} - W_0.
+\]
+This is less clean than extracting $BA$, but it is much faster and still gives a demo-quality overlap plot.
+
+\subsection{Delta extraction}
+
+\begin{verbatim}
+def get_delta(base_model, tuned_model, name):
+    b = dict(base_model.named_parameters())[name].detach().cpu().float()
+    t = dict(tuned_model.named_parameters())[name].detach().cpu().float()
+    return t - b
+
+names = []
+for name, p in base.named_parameters():
+    if "attention.self.query.weight" in name or "attention.self.value.weight" in name:
+        names.append(name)
+\end{verbatim}
+
+\subsection{SVD stats}
+
+\begin{verbatim}
+import torch
+
+def svd_energy(delta):
+    U, S, Vh = torch.linalg.svd(delta, full_matrices=False)
+    e = S.pow(2)
+    cum = torch.cumsum(e, dim=0) / e.sum()
+    return U, S, Vh, cum
+\end{verbatim}
+
+\subsection{Overlap}
+
+\begin{verbatim}
+def overlap(U1, U2, k):
+    A = U1[:, :k]
+    B = U2[:, :k]
+    return float(torch.linalg.norm(A.T @ B, ord="fro")**2 / k)
+\end{verbatim}
+
+\section{What to Put on the Slides}
+
+\subsection{Slide 1: Setup}
+
+\begin{itemize}
+    \item Frozen base: \texttt{roberta-base}.
+    \item Full FT checkpoint: \texttt{FFT-SST2}.
+    \item LoRA checkpoint: \texttt{LoRA-SST2}.
+    \item Matrices analyzed: query/value attention matrices.
+    \item Compute: SVD of update matrices and subspace overlap.
+\end{itemize}
+
+\subsection{Slide 2: Spectral result}
+
+Show cumulative energy curves. Use the talking point:
+\begin{quote}
+``The full fine-tuning update appears highly structured: a small number of directions explain a large share of the update energy.''
+\end{quote}
+
+\subsection{Slide 3: LoRA overlap}
+
+Show layer-wise or average overlap. Use the talking point:
+\begin{quote}
+``LoRA's update directions overlap with a subset of full fine-tuning directions, suggesting that parameter-efficient updates can recover part of the task-relevant subspace.''
+\end{quote}
+
+\subsection{Slide 4: Expert pool}
+
+Show the LoRA expert pool table. Use the talking point:
+\begin{quote}
+``Instead of one adapter per deployment, we can keep a small pool of adapters and route inputs to the relevant update.''
+\end{quote}
+
+\subsection{Slide 5: Three-hour conclusion}
+
+Use:
+\begin{quote}
+``A cheap prototype suggests three things: full fine-tuning updates are geometrically structured, LoRA captures a useful part of that structure, and a routed pool of LoRA experts is a practical path toward a general adapted model.''
+\end{quote}
+
+\section{Honest Caveats}
+
+For a presentation, keep this short:
+\begin{itemize}
+    \item One seed only.
+    \item Mostly checkpoint/model-card metrics.
+    \item SST-2 first, not broad task coverage.
+    \item Router may be oracle/task-based rather than learned.
+    \item The results are a fast prototype, not a rigorous evaluation.
+\end{itemize}
+
+\section{If Time Runs Out}
+
+If the clock is running out, produce only these:
+\begin{enumerate}
+    \item SVD plot for \texttt{FFT-SST2} vs \texttt{roberta-base};
+    \item overlap plot using \texttt{LoRA-SST2} vs \texttt{FFT-SST2};
+    \item table of existing LoRA expert checkpoints and their model-card metrics.
+\end{enumerate}
+
+This is enough for a good-looking presentation.
+
+\end{document}

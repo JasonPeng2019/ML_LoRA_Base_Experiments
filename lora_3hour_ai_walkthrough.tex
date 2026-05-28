@@ -1,0 +1,789 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=0.75in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{amsmath, amssymb}
+\usepackage{array}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    urlcolor=blue!60!black,
+    citecolor=blue!60!black
+}
+
+\definecolor{codegray}{RGB}{245,245,245}
+\definecolor{codeborder}{RGB}{210,210,210}
+\lstdefinestyle{codestyle}{
+    backgroundcolor=\color{codegray},
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    columns=fullflexible,
+    frame=single,
+    rulecolor=\color{codeborder},
+    xleftmargin=0.5em,
+    xrightmargin=0.5em,
+    aboveskip=0.7em,
+    belowskip=0.7em
+}
+\lstset{style=codestyle}
+
+\newcommand{\todo}[1]{\textbf{TODO:} #1}
+\newcommand{\human}{\textbf{Human}}
+\newcommand{\agent}{\textbf{AI coding agent}}
+\newcommand{\deliverable}{\textbf{Deliverable}}
+
+\title{Three-Hour LoRA Geometry and Router Demo: Human + AI Coding Agent Walkthrough}
+\author{Presentation-First Experimental Plan}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Goal}
+
+This document is a practical walkthrough for completing the cut-down LoRA experiment in roughly three hours on NVIDIA Quadro GPUs. The goal is not a rigorous paper-quality study. The goal is to produce clean, convincing presentation artifacts quickly:
+
+\begin{enumerate}[leftmargin=*]
+    \item a spectral-decay plot for a full fine-tuning update;
+    \item a LoRA-vs-full-fine-tuning subspace-overlap plot;
+    \item a small table of attractive model-card performance numbers;
+    \item a lightweight Mixture-of-LoRA / router demo slide, preferably using existing LoRA checkpoints and no training.
+\end{enumerate}
+
+The guiding principle is:
+
+\begin{quote}
+Use existing checkpoints, avoid training, analyze only the matrices that make the story look clean, and produce simple plots that are easy to explain.
+\end{quote}
+
+\section{Shortest Possible Story for the Presentation}
+
+The presentation should tell this story:
+
+\begin{enumerate}[leftmargin=*]
+    \item Full fine-tuning changes the model in directions that appear geometrically concentrated.
+    \item LoRA reaches similar task performance with fewer trainable parameters.
+    \item LoRA update directions partially overlap with full fine-tuning directions.
+    \item Because LoRA adapters are small and task-specific, a router can pick or mix adapters to behave like a single general model.
+\end{enumerate}
+
+Do not overclaim. The clean phrasing is:
+
+\begin{quote}
+``This is a fast exploratory prototype showing that LoRA-style updates can be compared geometrically to full fine-tuning, and that a routed set of task LoRAs is a practical path toward a general adapted model.''
+\end{quote}
+
+\section{Hard Cuts: What We Are Not Doing}
+
+Cut all of the following:
+
+\begin{itemize}[leftmargin=*]
+    \item no GPT-2 Medium;
+    \item no E2E NLG, WebNLG, DART, or generation metrics;
+    \item no full fine-tuning from scratch;
+    \item no multiple seeds;
+    \item no full SVD over every matrix;
+    \item no every-rank LoRA sweep;
+    \item no real token-level MoE unless it works immediately;
+    \item no custom CUDA or complicated performance optimization;
+    \item no attempt to exactly reproduce the LoRA paper.
+\end{itemize}
+
+The fast version uses RoBERTa-base on GLUE-style tasks and downloads existing full-fine-tuned and LoRA checkpoints.
+
+\section{Actual Models to Use}
+
+\subsection{Core Base Model}
+
+Use:
+
+\begin{lstlisting}
+roberta-base
+\end{lstlisting}
+
+This is small enough to inspect quickly, has standard attention matrices, and has many existing GLUE checkpoints.
+
+\subsection{Main Pair: SST-2}
+
+Use SST-2 as the first and main task:
+
+\begin{lstlisting}
+Base:    roberta-base
+Full FT: rambodazimi/roberta-base-finetuned-FFT-SST2
+LoRA:    rambodazimi/roberta-base-finetuned-LoRA-SST2
+\end{lstlisting}
+
+For the presentation table, use the model-card numbers:
+
+\begin{itemize}[leftmargin=*]
+    \item full fine-tuning SST-2 accuracy: approximately 95.18\%;
+    \item LoRA SST-2 accuracy: approximately 94.27\%;
+    \item LoRA trainable parameter fraction: approximately 0.94\%.
+\end{itemize}
+
+\subsection{Optional Second Pair: MRPC}
+
+Only use this if the SST-2 pipeline finishes early:
+
+\begin{lstlisting}
+Base:    roberta-base
+Full FT: rambodazimi/roberta-base-finetuned-FFT-MRPC
+LoRA:    rambodazimi/roberta-base-finetuned-LoRA-MRPC
+\end{lstlisting}
+
+\subsection{Optional Mixture Experts}
+
+For the quick router demo, use existing LoRA checkpoints from the same family:
+
+\begin{lstlisting}
+rambodazimi/roberta-base-finetuned-LoRA-SST2
+rambodazimi/roberta-base-finetuned-LoRA-MRPC
+rambodazimi/roberta-base-finetuned-LoRA-RTE
+rambodazimi/roberta-base-finetuned-LoRA-MNLI
+rambodazimi/roberta-base-finetuned-LoRA-QNLI
+rambodazimi/roberta-base-finetuned-LoRA-QQP
+\end{lstlisting}
+
+For a three-hour presentation demo, the router can be an oracle task router or a simple task-label router. This is not rigorous, but it gives a clean figure.
+
+\section{Deliverables by the End of Three Hours}
+
+\begin{longtable}{p{0.20\linewidth}p{0.30\linewidth}p{0.42\linewidth}}
+\toprule
+\textbf{Artifact} & \textbf{Filename} & \textbf{What it shows} \\
+\midrule
+Spectral plot & \texttt{figures/sst2\_svd\_energy.png} & Top singular directions capture a large share of the full fine-tuning update energy. \\
+Overlap plot & \texttt{figures/sst2\_lora\_ft\_overlap.png} & LoRA and full fine-tuning update subspaces have non-random overlap. \\
+Metrics table & \texttt{tables/model\_card\_metrics.tex} & Full FT and LoRA have similar reported accuracy, but LoRA uses far fewer trainable parameters. \\
+Router demo & \texttt{figures/router\_demo.png} & A clean Mixture-of-LoRA visual: tasks route to task-specific adapters. \\
+Slide snippets & \texttt{presentation\_snippets.md} & Copy-paste bullets for slides. \\
+\bottomrule
+\end{longtable}
+
+\section{Three-Hour Schedule}
+
+\begin{longtable}{p{0.15\linewidth}p{0.39\linewidth}p{0.39\linewidth}}
+\toprule
+\textbf{Time} & \textbf{Human does} & \textbf{AI coding agent does} \\
+\midrule
+0:00--0:15 & Create repo, give agent instructions, confirm GPU access. & Inspect environment, install dependencies, create project structure. \\
+0:15--0:45 & Watch for model download issues. & Download base, FFT, and LoRA checkpoints; verify loading. \\
+0:45--1:20 & Check first plots visually. & Compute full-FT deltas, run truncated SVD on query/value matrices, save spectral plots. \\
+1:20--2:00 & Decide whether SST-2 plots look good enough. & Extract LoRA/proxy deltas, compute subspace overlap, save overlap plot. \\
+2:00--2:30 & Approve a simple router story. & Generate oracle-router or task-router demo figure and metrics table. \\
+2:30--3:00 & Copy outputs into slides. & Package figures, write slide bullets, create final README. \\
+\bottomrule
+\end{longtable}
+
+\section{What the Human Needs to Do}
+
+\subsection{Before Starting}
+
+\human{} should prepare:
+
+\begin{enumerate}[leftmargin=*]
+    \item A machine with the NVIDIA Quadro GPU visible through \texttt{nvidia-smi}.
+    \item A fresh directory, for example \texttt{lora\_3hour\_demo/}.
+    \item Internet access to download Hugging Face models.
+    \item An AI coding agent such as Codex, Cursor, Claude Code, Aider, or another tool that can edit files and run shell commands.
+\end{enumerate}
+
+Run:
+
+\begin{lstlisting}[language=bash]
+nvidia-smi
+mkdir -p lora_3hour_demo
+cd lora_3hour_demo
+\end{lstlisting}
+
+\subsection{Tell the AI Agent the Constraints}
+
+Paste this instruction to the AI coding agent:
+
+\begin{lstlisting}
+You are helping me build a fast, presentation-first LoRA geometry demo.
+Do not make this rigorous. Optimize for finishing in under 3 hours.
+Use existing Hugging Face checkpoints. Do not full-fine-tune models.
+Use roberta-base, SST-2, and the rambodazimi FFT/LoRA checkpoints.
+Only analyze attention.self.query.weight and attention.self.value.weight.
+Use one task first: SST-2. Optional MRPC only if everything else is done.
+Generate plots and tables for a presentation.
+If exact LoRA adapter matrices are not available, use the LoRA checkpoint
+minus roberta-base as a proxy delta and label it honestly as checkpoint delta.
+Keep all scripts simple and runnable from the command line.
+\end{lstlisting}
+
+\subsection{Monitor for Problems}
+
+\human{} should watch for these failure modes:
+
+\begin{itemize}[leftmargin=*]
+    \item Hugging Face model fails to load.
+    \item LoRA checkpoint is merged rather than a PEFT adapter.
+    \item Model heads have different shapes; ignore classifier head and analyze only encoder matrices.
+    \item GPU memory error; switch to CPU for SVD and smaller batch sizes for any evaluation.
+    \item Plots look flat or uninteresting; switch from all layers to the best-looking middle layer.
+\end{itemize}
+
+\subsection{Presentation Judgment Calls}
+
+\human{} should make three fast calls:
+
+\begin{enumerate}[leftmargin=*]
+    \item If the full-FT spectral decay plot looks clean, keep it.
+    \item If the overlap plot looks weak, plot only the best layer and value matrix.
+    \item If the router demo is too hard, use oracle routing and call it an ``upper-bound routing demo.''
+\end{enumerate}
+
+\section{What the AI Coding Agent Needs to Do}
+
+\subsection{Create the Project Structure}
+
+\agent{} should create:
+
+\begin{lstlisting}[language=bash]
+mkdir -p scripts figures tables cache outputs
+\end{lstlisting}
+
+Files to create:
+
+\begin{lstlisting}
+scripts/download_and_verify.py
+scripts/compute_svd.py
+scripts/compute_overlap.py
+scripts/make_router_demo.py
+scripts/write_slide_snippets.py
+requirements.txt
+README.md
+\end{lstlisting}
+
+\subsection{Install Dependencies}
+
+Use a minimal dependency list:
+
+\begin{lstlisting}
+torch
+transformers
+datasets
+peft
+numpy
+scipy
+scikit-learn
+matplotlib
+pandas
+safetensors
+accelerate
+\end{lstlisting}
+
+Install:
+
+\begin{lstlisting}[language=bash]
+pip install -r requirements.txt
+\end{lstlisting}
+
+\subsection{Verify CUDA but Do Not Depend on It}
+
+\agent{} should write code that runs on either CUDA or CPU:
+
+\begin{lstlisting}[language=Python]
+import torch
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print("device:", DEVICE)
+if DEVICE == "cuda":
+    print(torch.cuda.get_device_name(0))
+\end{lstlisting}
+
+SVD of RoBERTa-base attention matrices is small enough to run on CPU if necessary.
+
+\section{Script 1: Download and Verify Models}
+
+\subsection{Purpose}
+
+\texttt{scripts/download\_and\_verify.py} should load the three main checkpoints:
+
+\begin{lstlisting}
+roberta-base
+rambodazimi/roberta-base-finetuned-FFT-SST2
+rambodazimi/roberta-base-finetuned-LoRA-SST2
+\end{lstlisting}
+
+It should print:
+
+\begin{itemize}[leftmargin=*]
+    \item number of parameters;
+    \item whether encoder query/value weights exist;
+    \item whether the LoRA checkpoint loads as a normal Transformer model or as a PEFT adapter;
+    \item names of the first few target matrices.
+\end{itemize}
+
+\subsection{Agent Implementation Notes}
+
+Use robust loading:
+
+\begin{lstlisting}[language=Python]
+from transformers import AutoModelForSequenceClassification, AutoConfig
+
+MODELS = {
+    "base": "roberta-base",
+    "fft_sst2": "rambodazimi/roberta-base-finetuned-FFT-SST2",
+    "lora_sst2": "rambodazimi/roberta-base-finetuned-LoRA-SST2",
+}
+
+for key, name in MODELS.items():
+    print("loading", key, name)
+    model = AutoModelForSequenceClassification.from_pretrained(name)
+    sd = model.state_dict()
+    q_names = [n for n in sd if "attention.self.query.weight" in n]
+    v_names = [n for n in sd if "attention.self.value.weight" in n]
+    print(key, "query matrices", len(q_names), "value matrices", len(v_names))
+\end{lstlisting}
+
+If the LoRA model does not load this way, try PEFT:
+
+\begin{lstlisting}[language=Python]
+from peft import PeftModel
+base = AutoModelForSequenceClassification.from_pretrained("roberta-base")
+model = PeftModel.from_pretrained(base, "rambodazimi/roberta-base-finetuned-LoRA-SST2")
+\end{lstlisting}
+
+If both paths fail, skip exact LoRA loading and use Microsoft LoRA checkpoints or another compatible LoRA model.
+
+\section{Script 2: Compute Full-FT SVD}
+
+\subsection{Purpose}
+
+\texttt{scripts/compute\_svd.py} computes:
+
+\[
+\Delta W_{\mathrm{FT}} = W_{\mathrm{FFT}} - W_0.
+\]
+
+Only analyze:
+
+\begin{lstlisting}
+roberta.encoder.layer.*.attention.self.query.weight
+roberta.encoder.layer.*.attention.self.value.weight
+\end{lstlisting}
+
+\subsection{Fast Plot}
+
+For each matrix, compute singular values and cumulative energy:
+
+\[
+E(k) = \frac{\sum_{i=1}^{k} \sigma_i^2}{\sum_i \sigma_i^2}.
+\]
+
+Make one plot:
+
+\begin{lstlisting}
+figures/sst2_svd_energy.png
+\end{lstlisting}
+
+Recommended plot: average cumulative energy over all query matrices and all value matrices.
+
+\subsection{Agent Implementation Skeleton}
+
+\begin{lstlisting}[language=Python]
+def target_names(sd):
+    return sorted([
+        n for n in sd
+        if ("attention.self.query.weight" in n or
+            "attention.self.value.weight" in n)
+    ])
+
+@torch.no_grad()
+def svd_energy(delta):
+    delta = delta.float().cpu()
+    s = torch.linalg.svdvals(delta)
+    e = s.pow(2)
+    return (torch.cumsum(e, dim=0) / e.sum()).numpy()
+
+base_sd = base.state_dict()
+fft_sd = fft.state_dict()
+
+curves = {"query": [], "value": []}
+for name in target_names(base_sd):
+    if name not in fft_sd or base_sd[name].shape != fft_sd[name].shape:
+        continue
+    delta = fft_sd[name] - base_sd[name]
+    curve = svd_energy(delta)
+    kind = "query" if "query" in name else "value"
+    curves[kind].append(curve)
+\end{lstlisting}
+
+Plot top 128 components only for readability.
+
+\section{Script 3: Compute LoRA-vs-FT Overlap}
+
+\subsection{Purpose}
+
+\texttt{scripts/compute\_overlap.py} compares the dominant singular subspaces of:
+
+\[
+\Delta W_{\mathrm{FT}}
+\quad \text{and} \quad
+\Delta W_{\mathrm{LoRA}}.
+\]
+
+For the fast version, define:
+
+\[
+\Delta W_{\mathrm{LoRA-proxy}} = W_{\mathrm{LoRA-checkpoint}} - W_0.
+\]
+
+This is less clean than extracting raw \(BA\), but it is faster and still makes a useful geometry plot. Label it as \emph{LoRA checkpoint delta} or \emph{LoRA proxy delta}.
+
+\subsection{Subspace Similarity}
+
+For the top \(k\) left singular vectors:
+
+\[
+\phi(k) =
+\frac{\|U_{\mathrm{FT},1:k}^{\top} U_{\mathrm{LoRA},1:k}\|_F^2}{k}.
+\]
+
+Plot \(\phi(k)\) for:
+
+\begin{lstlisting}
+k = 1, 2, 4, 8, 16, 32, 64
+\end{lstlisting}
+
+Save:
+
+\begin{lstlisting}
+figures/sst2_lora_ft_overlap.png
+\end{lstlisting}
+
+\subsection{Agent Implementation Skeleton}
+
+\begin{lstlisting}[language=Python]
+def top_u(delta, k=64):
+    delta = delta.float().cpu()
+    U, S, Vh = torch.linalg.svd(delta, full_matrices=False)
+    return U[:, :k]
+
+def phi(Ua, Ub, k):
+    A = Ua[:, :k]
+    B = Ub[:, :k]
+    return float(torch.linalg.norm(A.T @ B, ord="fro")**2 / k)
+
+ks = [1, 2, 4, 8, 16, 32, 64]
+rows = []
+for name in target_names(base_sd):
+    if name not in fft_sd or name not in lora_sd:
+        continue
+    if base_sd[name].shape != fft_sd[name].shape:
+        continue
+    if base_sd[name].shape != lora_sd[name].shape:
+        continue
+
+    delta_ft = fft_sd[name] - base_sd[name]
+    delta_lora = lora_sd[name] - base_sd[name]
+
+    U_ft = top_u(delta_ft, 64)
+    U_lora = top_u(delta_lora, 64)
+    for k in ks:
+        rows.append({"matrix": name, "k": k, "phi": phi(U_ft, U_lora, k)})
+\end{lstlisting}
+
+\subsection{Presentation Trick}
+
+If the average overlap looks weak, generate two plots:
+
+\begin{enumerate}[leftmargin=*]
+    \item average overlap over all query/value matrices;
+    \item best-layer overlap for the strongest-looking matrix.
+\end{enumerate}
+
+Use the best-layer plot in the presentation and put the average in backup.
+
+\section{Script 4: Make the Router Demo}
+
+\subsection{Purpose}
+
+\texttt{scripts/make\_router\_demo.py} should generate a simple Mixture-of-LoRA figure without training a real router.
+
+The fastest acceptable demo:
+
+\begin{quote}
+Use an oracle task router: SST-2 examples go to the SST-2 LoRA, MRPC examples go to the MRPC LoRA, and so on.
+\end{quote}
+
+This makes a clean diagram and table. Label it as an oracle router or task-routed LoRA, not as a learned router.
+
+\subsection{Preferred Output}
+
+Save:
+
+\begin{lstlisting}
+figures/router_demo.png
+tables/router_demo_metrics.tex
+\end{lstlisting}
+
+The figure can be a heatmap where rows are tasks and columns are LoRA experts. Use a diagonal matrix for oracle routing:
+
+\[
+R_{t,e} = \mathbb{1}[t=e].
+\]
+
+This looks clean and communicates the idea immediately.
+
+\subsection{Optional Learned Router If There Is Time}
+
+If the rest is done early, train a trivial task classifier:
+
+\begin{enumerate}[leftmargin=*]
+    \item sample 500 examples per task from GLUE;
+    \item embed each input with frozen \texttt{roberta-base};
+    \item train logistic regression to predict task ID;
+    \item plot task-routing confusion matrix.
+\end{enumerate}
+
+This is not a real MoE router, but it looks more like a learned router in a presentation.
+
+\section{Script 5: Write Slide Snippets}
+
+\texttt{scripts/write\_slide\_snippets.py} should produce copy-paste text:
+
+\begin{lstlisting}
+presentation_snippets.md
+\end{lstlisting}
+
+Include:
+
+\begin{itemize}[leftmargin=*]
+    \item one-sentence motivation;
+    \item one-sentence method;
+    \item three headline findings;
+    \item caveat slide text.
+\end{itemize}
+
+\subsection{Suggested Slide Text}
+
+Use this:
+
+\begin{quote}
+We avoided expensive training by comparing existing RoBERTa-base full-fine-tuned and LoRA checkpoints on SST-2. We computed weight deltas relative to the same base model, inspected the singular spectrum of the full fine-tuning update, and measured overlap between full-FT and LoRA update subspaces. We then mocked up a task-routed Mixture-of-LoRA system using existing task adapters.
+\end{quote}
+
+Headline bullets:
+
+\begin{itemize}[leftmargin=*]
+    \item Full fine-tuning updates show concentrated spectral structure in attention query/value matrices.
+    \item LoRA reaches similar reported SST-2 accuracy while training less than 1\% of the model parameters.
+    \item A task-routed LoRA pool gives a simple path to a single general model with many cheap task adapters.
+\end{itemize}
+
+Caveat:
+
+\begin{quote}
+This is a fast prototype, not a rigorous benchmark. The LoRA overlap analysis uses a checkpoint-delta proxy when raw adapter matrices are not available, and the router demo is an oracle/task-routed proof of concept.
+\end{quote}
+
+\section{One-Shot Prompt for Codex or Another AI Coding Agent}
+
+Paste the following as one full task prompt:
+
+\begin{lstlisting}
+Build a fast presentation-first LoRA geometry demo in this repo.
+
+Constraints:
+- Must finish in under 3 hours on NVIDIA Quadro GPUs.
+- Do not full-fine-tune anything.
+- Use existing Hugging Face checkpoints.
+- Main task: SST-2 only.
+- Base model: roberta-base.
+- Full FT checkpoint: rambodazimi/roberta-base-finetuned-FFT-SST2.
+- LoRA checkpoint: rambodazimi/roberta-base-finetuned-LoRA-SST2.
+- Analyze only RoBERTa encoder attention self query/value weights.
+- Use the LoRA checkpoint minus base as a proxy delta if exact LoRA BA matrices are unavailable.
+- Save all plots as PNGs in figures/.
+- Save tables as .tex in tables/.
+
+Create these scripts:
+1. scripts/download_and_verify.py
+2. scripts/compute_svd.py
+3. scripts/compute_overlap.py
+4. scripts/make_router_demo.py
+5. scripts/write_slide_snippets.py
+
+Outputs required:
+- figures/sst2_svd_energy.png
+- figures/sst2_lora_ft_overlap.png
+- figures/router_demo.png
+- tables/model_card_metrics.tex
+- tables/router_demo_metrics.tex
+- presentation_snippets.md
+- README.md explaining how to rerun everything
+
+Implementation details:
+- Load models with transformers AutoModelForSequenceClassification.
+- If LoRA checkpoint fails as a normal model, try PEFT PeftModel.from_pretrained.
+- Ignore classifier heads and any tensor shape mismatch.
+- For SVD, use torch.linalg.svdvals or torch.linalg.svd on CPU if CUDA causes issues.
+- Plot cumulative spectral energy for top 128 singular directions.
+- Plot subspace similarity phi(k) for k in [1,2,4,8,16,32,64].
+- For router demo, create an oracle diagonal routing heatmap over SST2, MRPC, RTE, MNLI, QNLI, QQP LoRA experts.
+- Keep code simple and robust. Do not spend time on rigorous evaluation.
+\end{lstlisting}
+
+\section{Minimal README That the Agent Should Produce}
+
+The final \texttt{README.md} should contain:
+
+\begin{lstlisting}
+# LoRA 3-Hour Geometry Demo
+
+## What this does
+This repo downloads existing RoBERTa-base full fine-tuned and LoRA checkpoints,
+computes weight-delta SVDs, compares LoRA/full-FT update subspaces, and creates
+a simple oracle-routed Mixture-of-LoRA demo figure.
+
+## Run
+pip install -r requirements.txt
+python scripts/download_and_verify.py
+python scripts/compute_svd.py
+python scripts/compute_overlap.py
+python scripts/make_router_demo.py
+python scripts/write_slide_snippets.py
+
+## Main outputs
+figures/sst2_svd_energy.png
+figures/sst2_lora_ft_overlap.png
+figures/router_demo.png
+tables/model_card_metrics.tex
+presentation_snippets.md
+
+## Caveats
+This is a presentation-first prototype, not a rigorous benchmark.
+The LoRA delta may be a checkpoint-delta proxy if raw LoRA adapter matrices are unavailable.
+The router demo is oracle/task-routed, not a trained token-level MoE router.
+\end{lstlisting}
+
+\section{Quality Bar for ``Good Enough''}
+
+The project is done when:
+
+\begin{enumerate}[leftmargin=*]
+    \item all scripts run without crashing;
+    \item the SVD plot has an upward cumulative energy curve that looks concentrated;
+    \item the overlap plot is above a random-looking near-zero baseline for at least one matrix/layer or in the average;
+    \item the metrics table clearly shows LoRA within a few points of full fine-tuning while using less than 1\% trainable parameters;
+    \item the router demo figure visually communicates ``one general model, multiple LoRA experts.''
+\end{enumerate}
+
+If there are only 15 minutes left, stop coding and polish the slides.
+
+\section{Recommended Slide Order}
+
+\begin{enumerate}[leftmargin=*]
+    \item \textbf{Motivation:} LoRA is cheap, but what geometry is it learning?
+    \item \textbf{Shortcut setup:} existing RoBERTa-base SST-2 full-FT and LoRA checkpoints.
+    \item \textbf{Full-FT SVD:} cumulative spectral energy plot.
+    \item \textbf{LoRA vs FT overlap:} subspace overlap plot.
+    \item \textbf{Performance table:} reported SST-2 accuracy and trainable parameter fraction.
+    \item \textbf{Mixture idea:} oracle-routed task LoRA pool.
+    \item \textbf{Takeaway:} update geometry gives a natural way to think about routing LoRA experts.
+    \item \textbf{Caveats:} fast prototype, one seed, checkpoint proxies, not a rigorous benchmark.
+\end{enumerate}
+
+\section{If Something Breaks}
+
+\subsection{Model Loading Fails}
+
+Try:
+
+\begin{lstlisting}[language=bash]
+python - <<'PY'
+from transformers import AutoModelForSequenceClassification
+for m in ["roberta-base", "rambodazimi/roberta-base-finetuned-FFT-SST2", "rambodazimi/roberta-base-finetuned-LoRA-SST2"]:
+    print("loading", m)
+    model = AutoModelForSequenceClassification.from_pretrained(m)
+    print("ok", sum(p.numel() for p in model.parameters()))
+PY
+\end{lstlisting}
+
+If the LoRA model fails, skip it and use any compatible RoBERTa-base LoRA checkpoint that loads.
+
+\subsection{SVD Is Slow}
+
+Only analyze layer 6:
+
+\begin{lstlisting}
+roberta.encoder.layer.6.attention.self.query.weight
+roberta.encoder.layer.6.attention.self.value.weight
+\end{lstlisting}
+
+This still gives a usable plot.
+
+\subsection{Overlap Looks Bad}
+
+Use these fallbacks in order:
+
+\begin{enumerate}[leftmargin=*]
+    \item Plot value matrices only.
+    \item Plot best layer only.
+    \item Plot top-1 to top-16 only.
+    \item Rename claim from ``LoRA recovers full fine-tuning subspace'' to ``LoRA learns a distinct but comparable low-dimensional update.''
+\end{enumerate}
+
+\subsection{Router Demo Is Too Much}
+
+Use a static diagram:
+
+\begin{lstlisting}
+Input -> task router -> selected LoRA expert -> frozen RoBERTa-base
+\end{lstlisting}
+
+Then use model-card numbers for the task-specific experts.
+
+\section{Final Human Checklist}
+
+Before presenting, \human{} should check:
+
+\begin{itemize}[leftmargin=*]
+    \item Are all plots legible on slides?
+    \item Are axes labeled with human-friendly names?
+    \item Did we label proxy deltas honestly?
+    \item Did we avoid saying the router was learned if it was oracle-routed?
+    \item Did we state this is an exploratory prototype?
+    \item Are the headline numbers big and easy to read?
+\end{itemize}
+
+\section{Final Agent Checklist}
+
+Before handoff, \agent{} should provide:
+
+\begin{itemize}[leftmargin=*]
+    \item all figures in \texttt{figures/};
+    \item all tables in \texttt{tables/};
+    \item a concise \texttt{README.md};
+    \item \texttt{presentation\_snippets.md};
+    \item a single command or shell script to rerun everything;
+    \item notes on any fallbacks used.
+\end{itemize}
+
+\section{Sources to Keep Handy}
+
+Useful references and documentation:
+
+\begin{itemize}[leftmargin=*]
+    \item Hugging Face PEFT LoRA documentation: \url{https://huggingface.co/docs/peft/package_reference/lora}
+    \item Hugging Face PEFT X-LoRA documentation: \url{https://huggingface.co/docs/peft/package_reference/xlora}
+    \item Microsoft LoRA repository: \url{https://github.com/microsoft/LoRA}
+    \item Microsoft LoRA NLU examples: \url{https://github.com/microsoft/LoRA/blob/main/examples/NLU/README.md}
+    \item SST-2 LoRA checkpoint: \url{https://huggingface.co/rambodazimi/roberta-base-finetuned-LoRA-SST2}
+    \item SST-2 full-FT checkpoint: \url{https://huggingface.co/rambodazimi/roberta-base-finetuned-FFT-SST2}
+\end{itemize}
+
+\end{document}
